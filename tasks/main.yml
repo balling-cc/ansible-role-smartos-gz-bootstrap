@@ -1,0 +1,37 @@
+---
+- name: Checking if python binary is installed
+  raw: test -f {{ smartos_gz_python }}
+  register: python_file
+  ignore_errors: True
+ 
+- name: Check if pkgin is installed
+  raw: test -f {{ smartos_gz_pkgin }}
+  register: pkgin_file
+  ignore_errors: True
+  when: python_file|failed
+ 
+- name: Check if bootstrap file is installed
+  raw: test -f {{ smartos_gz_bootstrap_file }}
+  register: bootstrap_file
+  ignore_errors: True
+  when: python_file|failed and pkgin_file|failed
+ 
+- name: Download bootstrap file if required
+  raw: curl -ks {{ smartos_gz_bootstrap_url }} -o {{ smartos_gz_bootstrap_file }}
+  when: bootstrap_file|failed
+ 
+- name: Verify bootstrap file
+  raw: if [[ `digest -a sha1 {{ smartos_gz_bootstrap_file }}` == "{{ smartos_gz_bootstrap_sha1sum }}" ]]; then exit 0; else exit 1; fi
+  when: python_file|failed and pkgin_file|failed
+ 
+- name: Extract bootstrap file
+  raw: tar -zxpf {{ smartos_gz_bootstrap_file }} -C /
+  when: python_file|failed and pkgin_file|failed
+
+- name: Update pkgin cache
+  raw: "{{ smartos_gz_pkgin }} update -f"
+  when: python_file|failed
+ 
+- name: Install python
+  raw: "{{ smartos_gz_pkgin }} -fy install {{ smartos_gz_python_pkgname }}"
+  when: python_file|failed
